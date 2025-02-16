@@ -1,0 +1,48 @@
+# -----------------------
+# Rust / Cargo
+# -----------------------
+/target/
+**/target/
+!.github/workflows/cargo
+
+# Prevent uploading Cargo.lock (if you have a library crate)
+# But for binary projects, many people commit Cargo.lock
+# Uncomment if you do NOT want Cargo.lock
+# Cargo.lock
+
+# Cargo, rustup, or temporary build files
+/.cargo/
+*.rlib
+*.rmeta
+
+# -----------------------
+# OS-Specific
+# -----------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+*.lnk
+
+# Linux
+*~
+
+# -----------------------
+# Visual Studio Code
+# -----------------------
+.vscode/
+*.code-workspace
+
+# -----------------------
+# Optional: Tools / Temp
+# -----------------------
+/.idea/
+/*.swp
+/.swm
+/.swo
+*.bak
+*.tmp

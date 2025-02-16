@@ -1,0 +1,12 @@
+[package]
+name = "asm2hex"
+version = "1.0.0"
+authors = ["Divyam Sirswal"]
+description = "A cross-platform tool to assemble, link, and convert .asm files to .hex"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/yourusername/asm2hex"
+
+[dependencies]
+eframe = "0.26"
+rfd = "0.11"  # For file selection dialog
