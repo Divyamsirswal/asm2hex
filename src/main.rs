@@ -11,9 +11,6 @@ use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-// ----------------------------------------
-// 1) BitsMode - which bits to use
-// ----------------------------------------
 #[derive(Clone, Copy, PartialEq)]
 enum BitsMode {
     BITS16,
@@ -21,14 +18,12 @@ enum BitsMode {
     BITS64,
 }
 
-// Default bits mode -> 64
 impl Default for BitsMode {
     fn default() -> Self {
         BitsMode::BITS64
     }
 }
 
-// Helper to get "16", "32", "64"
 impl BitsMode {
     fn bits_mode_str(&self) -> &'static str {
         match self {
@@ -39,53 +34,33 @@ impl BitsMode {
     }
 }
 
-// ----------------------------------------
-// 2) Main App State
-// ----------------------------------------
 #[derive(Default)]
 struct App {
-    // The .asm files to be converted
     asm_files: Vec<String>,
-
-    // Folder where .bin & .hex files go
     output_folder: Option<String>,
-
-    // Concurrency + logs
     log: Arc<Mutex<String>>,
     progress: Arc<Mutex<f32>>,
     dark_mode: bool,
-
-    // For .hex file preview
     hex_preview: Arc<Mutex<String>>,
     latest_hex_file: Arc<Mutex<Option<String>>>,
-
-    // ASM bits mode (16,32,64)
     bits_mode: BitsMode,
     auto_insert_bits: bool,
 }
 
 impl eframe::App for App {
-    fn update(&mut self, ctx: &Context, frame: &mut eframe::Frame) {
-        // 1) THEME
+    fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
         ctx.set_visuals(if self.dark_mode {
             Visuals::dark()
         } else {
             Visuals::light()
         });
-
-        // 2) TOP MENU (File, Help, Theme Toggle)
         TopBottomPanel::top("menu_bar").show(ctx, |ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.heading("🚀asm2hex");
-
                 ui.separator();
-
-                // Toggle theme
                 if ui.button("🌗 Toggle Theme").clicked() {
                     self.dark_mode = !self.dark_mode;
                 }
-
-                // FILE menu
                 ui.menu_button("File", |ui| {
                     if ui.button("Clear Logs").clicked() {
                         let mut lg = self.log.lock().unwrap();
@@ -93,34 +68,25 @@ impl eframe::App for App {
                         ui.close_menu();
                     }
                     if ui.button("Exit").clicked() {
-                        // Graceful exit
                         std::process::exit(0);
                     }
                 });
-
-                // HELP menu
                 ui.menu_button("Help", |ui| {
                     if ui.button("View Documentation").clicked() {
-                        // Could open link, show a help modal, etc.
                         ui.close_menu();
                     }
                     if ui.button("About").clicked() {
-                        // Show about info
                         ui.close_menu();
                     }
                 });
             });
         });
-
-        // 3) LEFT SIDE PANEL
         SidePanel::left("side_panel")
             .resizable(true)
             .min_width(250.0)
             .show(ctx, |ui| {
                 ui.label("A professional, multi-arch converter.");
                 ui.separator();
-
-                // Bits Mode settings
                 CollapsingHeader::new("Bits Mode Settings")
                     .default_open(true)
                     .show(ui, |ui| {
@@ -137,14 +103,9 @@ impl eframe::App for App {
                             .radio_value(&mut self.bits_mode, BitsMode::BITS64, "64-bit")
                             .clicked()
                         {}
-
-                        ui.checkbox(&mut self.auto_insert_bits, "Auto-insert [bits X]")
-                            .on_hover_text("If missing, prepend `[bits 16/32/64]` at top.");
+                        ui.checkbox(&mut self.auto_insert_bits, "Auto-insert [bits X]");
                     });
-
                 ui.separator();
-
-                // File selection
                 CollapsingHeader::new("File Selection")
                     .default_open(true)
                     .show(ui, |ui| {
@@ -159,7 +120,6 @@ impl eframe::App for App {
                             }
                         }
                         ui.separator();
-
                         if self.asm_files.is_empty() {
                             ui.label("No files selected.");
                         } else {
@@ -176,10 +136,7 @@ impl eframe::App for App {
                             });
                         }
                     });
-
                 ui.separator();
-
-                // Output Folder
                 CollapsingHeader::new("Output Folder")
                     .default_open(true)
                     .show(ui, |ui| {
@@ -199,10 +156,7 @@ impl eframe::App for App {
                             ui.label("No output folder selected.");
                         }
                     });
-
                 ui.separator();
-
-                // Convert button
                 if ui.button("⚡ Convert to HEX").clicked() {
                     if !self.asm_files.is_empty() {
                         let files = self.asm_files.clone();
@@ -210,20 +164,15 @@ impl eframe::App for App {
                             .output_folder
                             .clone()
                             .unwrap_or_else(|| ".".to_string());
-
                         let log_ref = Arc::clone(&self.log);
                         let progress_ref = Arc::clone(&self.progress);
                         let hex_preview_ref = Arc::clone(&self.hex_preview);
                         let latest_file_ref = Arc::clone(&self.latest_hex_file);
-
                         let bits_mode = self.bits_mode;
                         let auto_insert = self.auto_insert_bits;
-
-                        // Spawn a background thread to process each file
                         thread::spawn(move || {
                             let total = files.len() as f32;
                             let mut done = 0.0;
-
                             for file_path in files {
                                 let file_stem = Path::new(&file_path)
                                     .file_stem()
@@ -231,7 +180,6 @@ impl eframe::App for App {
                                     .unwrap_or("output");
                                 let bin_file = format!("{}/{}.bin", out_folder, file_stem);
                                 let hex_file = format!("{}/{}.hex", out_folder, file_stem);
-
                                 convert_asm_file(
                                     &file_path,
                                     &bin_file,
@@ -242,7 +190,6 @@ impl eframe::App for App {
                                     Arc::clone(&hex_preview_ref),
                                     Arc::clone(&latest_file_ref),
                                 );
-
                                 done += 1.0;
                                 *progress_ref.lock().unwrap() = done / total;
                             }
@@ -250,18 +197,13 @@ impl eframe::App for App {
                         });
                     }
                 }
-
-                // Show progress bar if in progress
                 let progress_val = *self.progress.lock().unwrap();
                 if progress_val > 0.0 && progress_val < 1.0 {
                     ui.separator();
                     ui.label("⏳ Converting...");
                     ui.add(egui::ProgressBar::new(progress_val).desired_width(200.0));
                 }
-
                 ui.separator();
-
-                // Logs
                 CollapsingHeader::new("Logs (color-coded)")
                     .default_open(true)
                     .show(ui, |ui| {
@@ -271,8 +213,6 @@ impl eframe::App for App {
                         });
                     });
             });
-
-        // 4) CENTRAL PANEL → HEX PREVIEW
         CentralPanel::default().show(ctx, |ui| {
             ui.heading("📜 Full HEX Preview (Entire File)");
             ui.separator();
@@ -283,7 +223,6 @@ impl eframe::App for App {
                 }
             }
             let txt = self.hex_preview.lock().unwrap().clone();
-
             ScrollArea::vertical().show(ui, |ui| {
                 ui.add(
                     TextEdit::multiline(&mut txt.clone())
@@ -292,14 +231,10 @@ impl eframe::App for App {
                 );
             });
         });
-
-        ctx.request_repaint(); // refresh UI continuously
+        ctx.request_repaint();
     }
 }
 
-// -------------------------------------------
-// Convert .asm -> .bin -> .hex, with logs
-// -------------------------------------------
 fn convert_asm_file(
     asm_path: &str,
     bin_path: &str,
@@ -310,19 +245,14 @@ fn convert_asm_file(
     hex_preview: Arc<Mutex<String>>,
     latest_file: Arc<Mutex<Option<String>>>,
 ) {
-    // Clear logs, show "Processing"
     {
         let mut l = log_ref.lock().unwrap();
         l.clear();
         l.push_str(&format!("🔍 Processing {}\n", asm_path));
     }
-
-    // Maybe auto-insert [bits X]
     if auto_insert {
         maybe_insert_bits(asm_path, bits_mode, &log_ref);
     }
-
-    // 1) nasm -> .bin
     let out_asm = Command::new("nasm")
         .args(["-f", "bin", asm_path, "-o", bin_path])
         .output();
@@ -338,8 +268,6 @@ fn convert_asm_file(
         l.push_str("❌ Error: Could not run nasm.\n");
         return;
     }
-
-    // 2) objcopy -> .hex
     let oc = Command::new("objcopy")
         .args(["-I", "binary", "-O", "ihex", bin_path, hex_path])
         .output();
@@ -355,8 +283,6 @@ fn convert_asm_file(
         l.push_str("❌ Error: Could not run objcopy.\n");
         return;
     }
-
-    // 3) On success
     {
         let mut l = log_ref.lock().unwrap();
         l.push_str(&format!("✅ Success! HEX saved at {}\n", hex_path));
@@ -365,17 +291,12 @@ fn convert_asm_file(
         let mut lf = latest_file.lock().unwrap();
         *lf = Some(hex_path.to_string());
     }
-
-    // Update preview
     if let Some(preview) = read_full_hex(hex_path) {
         let mut hp = hex_preview.lock().unwrap();
         *hp = preview;
     }
 }
 
-// ----------------------------------------
-// Insert [bits X] if missing
-// ----------------------------------------
 fn maybe_insert_bits(asm_path: &str, bits_mode: BitsMode, log_ref: &Arc<Mutex<String>>) {
     let file_data = match std::fs::read_to_string(asm_path) {
         Ok(s) => s,
@@ -402,9 +323,6 @@ fn maybe_insert_bits(asm_path: &str, bits_mode: BitsMode, log_ref: &Arc<Mutex<St
     }
 }
 
-// ----------------------------------------
-// Read entire .hex file
-// ----------------------------------------
 fn read_full_hex(hex_path: &str) -> Option<String> {
     let f = File::open(hex_path).ok()?;
     let rdr = io::BufReader::new(f);
@@ -416,9 +334,6 @@ fn read_full_hex(hex_path: &str) -> Option<String> {
     Some(lines)
 }
 
-// ----------------------------------------
-// Display color-coded logs
-// ----------------------------------------
 fn display_colored_logs(ui: &mut egui::Ui, log_text: &str) {
     for line in log_text.lines() {
         let mut color = Color32::WHITE;
@@ -433,9 +348,6 @@ fn display_colored_logs(ui: &mut egui::Ui, log_text: &str) {
     }
 }
 
-// ----------------------------------------
-// Entry Point
-// ----------------------------------------
 fn main() -> Result<(), eframe::Error> {
     let app = App {
         bits_mode: BitsMode::BITS64,
